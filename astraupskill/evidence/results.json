@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "executedTests": 5,
+  "checks": [
+    {
+      "project": "_Organized Desktop/05 Numbered Experiments/w22",
+      "id": "529eba39810c",
+      "command": [
+        "node",
+        "--experimental-vm-modules",
+        "--test",
+        "tests/runtime-refund-scope.test.mjs"
+      ],
+      "cwd": "C:\\Users\\Owner\\Desktop\\AstraOrganized2\\astra-remaining-improvements\\stage\\529eba39810c",
+      "environmentOverrides": {},
+      "startedAt": "2026-09-22T02:35:42.083464+00:00",
+      "status": "complete",
+      "log": "crud-b04-astra-runtime.log",
+      "pid": 36268,
+      "exitCode": 0,
+      "passed": true,
+      "finishedAt": "2026-09-22T02:35:51.711194+00:00",
+      "elapsedSeconds": 9.63
+    }
+  ],
+  "limits": [
+    "Five runtime cases execute actual refund service, state machine and RouteError with explicit repository/transaction/UUID adapters. No native Prisma, PostgreSQL, HTTP or provider payment operation was executed.",
+    "Passing the transaction client keeps reads and writes in the same transaction, but default isolation does not by itself prevent simultaneous refunds from exceeding the allowance. No locking, serializable retry or durable idempotency was added.",
+    "The existing service simulates provider success with a generated id; tests do not establish real-provider refunds, real database rollback or request authorization."
+  ]
+}

@@ -1,0 +1,7 @@
+# Codebase map
+
+The route validates a payment refund, then `createRefundForPayment` loads payment state, sums successful refunds, checks allowance, creates a pending refund, records events, transitions the refund, and may mark the payment fully refunded. Repository functions accept an optional DatabaseClient. The fix supplies `tx` to `findPaymentById` and `sumSuccessfulRefundsForPayment`. Trace: request -> transaction -> payment read -> refund aggregate -> assertion -> writes. The snapshot preserves the old service. 
+
+The route guard supplies permission before the service runs. The payment repository returns a detailed payment shape, while the refund repository aggregates only successful rows. Keeping those reads on tx makes the dependency boundary explicit and lets a reviewer ask whether every later write uses the same client. The service still creates audit events and provider identifiers after validation. A future integration check should inspect transaction rollback when a later event write fails. That behavior is outside this helper evidence.
+
+The transaction now opens before either read. Follow [refundRepository.ts](../src/repositories/refundRepository.ts): its optional client defaults to prisma when omitted, and its aggregate counts only SUCCEEDED rows. Passing tx is therefore meaningful behavior, not a naming convention. All subsequent event and status writes already received tx.

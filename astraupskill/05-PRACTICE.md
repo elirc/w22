@@ -1,0 +1,5 @@
+# Practice
+
+Level one: for a payment of 100 with successful refunds 60, predict whether 40 and 41 are allowed. Level two: trace the transaction client through payment read, aggregate, create, status transition, and event writes. Level three: explain what database isolation is still needed for two concurrent 40-unit requests. Level four: design an integration test that holds one transaction open and observes the second. Record which claims the VM test supports and which require PostgreSQL. Do not label a transaction boundary as idempotency.
+
+For each amount, write the remaining balance and expected payment status before consulting the solution. Add a partial case: previous refunds 10 and new refund 40 against 100. Which status transition must be absent? Then inject failure into REFUND_REQUESTED after the refund row adapter returns. List the later calls that must not occur and identify what additional observation would prove database rollback. Score two points each for arithmetic, client identity, branch prediction, stopping point and isolation limits. A correct answer separates the simulated provider id from any real external financial operation.

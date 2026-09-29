@@ -1,0 +1,7 @@
+# Concepts
+
+Refund identity includes payment id, current payment status, original captured amount, and prior successful refund total. A current amount alone is insufficient. A transaction client is a consistency boundary, not automatically a serialization guarantee. It makes the reads and later writes participate in one unit, while concurrent transaction isolation still depends on database configuration and locking. This differs from idempotency: repeating a refund request needs a durable request policy, which this fix does not add. Authorization is enforced elsewhere by the route guard.
+
+The remaining amount is original payment amount minus successful refunds, not minus pending rows. That policy avoids reserving an unconfirmed refund as completed money, but it also means concurrent requests need database isolation or locking. The service catches no generic error, so callers can distinguish domain RouteError from infrastructure failures. This distinction prevents a learner from confusing accounting state with request state or provider state. A reviewer should document the chosen isolation assumptions beside any future database test.
+
+The current provider-success step is simulated with a generated identifier. Moving local reads into a transaction does not turn that simulation into a real provider refund or solve the coordination problem between a remote payment system and a database commit.

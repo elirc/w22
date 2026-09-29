@@ -1,0 +1,7 @@
+# Testing and debugging
+
+The runtime harness executes the real TypeScript refund service with actual state machine and RouteError plus repository, status, transaction and UUID adapters. The first case asserts the payment read, refund sum, and create calls receive the same transaction client. The second case checks the remaining allowance and verifies no refund row is created. Debug a failure by inspecting call order, client identity, then assertion output. The harness does not execute Prisma, route auth, or a real database.
+
+A failing first case usually means one repository call still uses its default client. A failing second case usually means the allowance was calculated from the original amount instead of the remaining amount, or the create call happened before the assertion. These failures are easy to localize because the fixture records ordered calls. Do not replace the explicit client assertion with a snapshot alone; snapshots can hide which boundary performed a read. The command log records only the focused service cases and should not be generalized to the full payment application.
+
+The accepted five cases also assert full and partial status outcomes, missing-payment rejection and identity-preserving event failure. The real state machine and error class execute; repository and transaction operations remain adapters. A failure after create is an attempted partial workflow in the ledger, not evidence that a real row persisted or rolled back.
