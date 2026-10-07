@@ -55,7 +55,7 @@ erDiagram
 ## WebhookEvent
 - Schema/model file: `prisma/schema.prisma` model `WebhookEvent`
 - Primary service owner: `src/services/webhookService.ts` via `processProviderWebhook()`
-- Notes: Inbound processing is idempotent on `providerEventId`, not just on payment id.
+- Notes: Inbound processing is idempotent on `providerEventId`, not just on payment id: a `PROCESSED` event short-circuits (`src/services/webhookService.ts:30-37`) and the column is unique (`prisma/schema.prisma:216`). The check runs before the transaction, so concurrent duplicates are caught by the unique constraint rather than handled gracefully.
 
 ## PaymentEvent
 - Schema/model file: `prisma/schema.prisma` model `PaymentEvent`
@@ -65,7 +65,7 @@ erDiagram
 ## Refund
 - Schema/model file: `prisma/schema.prisma` model `Refund`
 - Primary service owner: `src/services/refundService.ts` via `createRefundForPayment()`
-- Notes: Full refunds transition the payment to `REFUNDED`; partial refunds leave the payment in `SUCCEEDED`.
+- Notes: Full refunds transition the payment to `REFUNDED`; partial refunds leave the payment in `SUCCEEDED`. The refund path never updates `ProviderPayment.status`, so after a full refund the provider mirror still says `SUCCEEDED` and `runReconciliation()` records a `STATUS_MISMATCH` for that payment (`src/services/reconciliationService.ts:58-81`). Refunds are marked `SUCCEEDED` in the same transaction that creates them (`src/services/refundService.ts:62`); no real provider is called.
 
 ## ReconciliationRun
 - Schema/model file: `prisma/schema.prisma` model `ReconciliationRun`

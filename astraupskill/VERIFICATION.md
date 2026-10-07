@@ -1,9 +1,43 @@
 # Verification
 
-Executed command: `node --experimental-vm-modules --test tests/runtime-refund-scope.test.mjs`; accepted expanded result 5/5 passed. The first case proves payment and prior-refund reads use the transaction client before create. The second proves remaining allowance rejects an over-refund without creating a row. The test loads the actual service source with explicit doubles. Native Prisma, PostgreSQL isolation, HTTP auth, provider refund dispatch, and concurrent real transactions were not executed. The exact original service is in `astraupskill/snapshots/src/services/refundService.ts`. The evidence supports transaction-client propagation and local allowance ordering only.
+## What was executed (historical record)
 
-The accepted expanded suite is captured as crud-b04-astra-runtime and has five passing cases. It executes actual service, state machine and RouteError, with explicit repository, transaction and UUID adapters. All read and write collaborator calls assert the shared transaction handle. No real payment provider is called. The failed-event case verifies propagation and stopping order, not durable rollback. The repository defaults and route validation were source-reviewed; route authorization and input-schema execution were not part of this command.
+One command, recorded in [evidence/results.json](evidence/results.json):
 
-## Astra execution evidence
+```
+node --experimental-vm-modules --test tests/runtime-refund-scope.test.mjs
+```
 
-The captured focused production-source suite executed 5 tests: all passed, zero failed and zero skipped. Read the [captured output](evidence/crud-b04-astra-runtime.log) and [exact command and limits](evidence/results.json). Earlier check records remain preserved in the workspace.
+Recorded result: `"passed": true`, `"executedTests": 5`, `"exitCode": 0`, 9.63 s, run on
+2026-09-22 in a staging copy (the `cwd` field points at a staging directory, not this clone). The
+log the JSON names (`crud-b04-astra-runtime.log`) is not committed here; only the JSON is. Nothing
+was re-run while this documentation was refined.
+
+## What the five cases execute
+
+The real `src/services/refundService.ts`, `src/lib/domain/paymentStateMachine.ts` and
+`src/lib/errors.ts`, with stubbed Prisma enums, transaction, repositories and UUID
+(`tests/runtime-refund-scope.test.mjs:10-26`). Each stub asserts it received the shared `tx`
+(line 9). The cases are tabulated in 04.
+
+## Limits (from results.json, still accurate)
+
+- No native Prisma, PostgreSQL, HTTP, or provider call was executed.
+- Passing the transaction client keeps reads and writes in one transaction, but default isolation
+  does not prevent simultaneous refunds from exceeding the allowance. No locking, serializable
+  retry, or durable refund idempotency was added.
+- The service simulates provider success with a generated id; the tests do not establish real
+  provider refunds, real rollback, or request authorization.
+
+## What was source-reviewed but not executed
+
+The route guard (`src/lib/auth/guards.ts`), the refund schema
+(`src/lib/validation/paymentSchemas.ts:24-37`), and the repository defaults were read, not run. The
+findings in 06 come from reading and are not test results.
+
+## How to reproduce
+
+From the repo root on a Node version whose `node:module` exports `stripTypeScriptTypes` (imported
+by `tests/helpers/load-typescript.mjs`), run the command above. It needs no installed packages.
+**Check:** five passing tests. An `Unstubbed external dependency` error means the service gained an
+import that the fixture at lines 10-26 does not stub.

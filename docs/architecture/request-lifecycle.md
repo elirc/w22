@@ -1,8 +1,8 @@
 # Request Lifecycle
 
 Request: Create a payment request with idempotency
-1. `src/app/api/payments/route.ts` — `POST` receives the request, extracts the `Idempotency-Key` header, and parses the body with `createPaymentSchema.parse()`.
-2. `src/lib/auth/guards.ts` — `withRouteAuth()` resolves the cookie session through `getSessionForRequest()` and enforces `Permission.PAYMENT_CREATE`.
+1. `src/lib/auth/guards.ts:28-35` — `POST` in `src/app/api/payments/route.ts` is the function returned by `withRouteAuth()`, so it first resolves the cookie session through `getSessionForRequest()` and enforces `Permission.PAYMENT_CREATE` (line 32).
+2. `src/app/api/payments/route.ts:11-16` — only then does the handler parse the body with `createPaymentSchema.parse()` and read the `Idempotency-Key` header.
 3. `src/services/paymentService.ts` — `createPaymentWithIdempotency()` hashes the request with `buildRequestFingerprint()` and checks for an existing `IdempotencyRecord`.
 4. `src/repositories/idempotencyRepository.ts` — `findIdempotencyRecord()` and `createIdempotencyRecord()` either replay, reject, or open a new in-progress record.
 5. `src/services/paymentAccessPolicy.ts` — `resolvePaymentOwnerForCreate()` decides who owns the payment and rejects unauthorized owner overrides.
@@ -18,7 +18,7 @@ Request: Process a provider webhook and finalize payment status
 3. `src/repositories/providerRepository.ts` — `findProviderPaymentByExternalId()` resolves the provider mirror row.
 4. `src/repositories/paymentRepository.ts` — `findPaymentById()` loads the local payment that will be updated.
 5. `src/lib/domain/paymentStateMachine.ts` — `resolveLocalStatusFromProviderStatus()` maps provider truth into local state and `assertAllowedPaymentTransition()` blocks illegal jumps.
-6. `src/repositories/webhookRepository.ts` — `createWebhookEvent()` persists the inbound event before mutation, then `markWebhookEventProcessed()` finalizes it.
+6. `src/repositories/webhookRepository.ts` — inside one transaction (`src/services/webhookService.ts:53-128`), `createWebhookEvent()` inserts the inbound event before the mutation and `markWebhookEventProcessed()` finalizes it. Because they share the transaction, a failure rolls back the event row too, including the `REJECTED` mark written at line 125.
 7. `src/repositories/paymentRepository.ts` — `transitionPaymentStatus()` updates the local payment.
 8. `src/repositories/paymentEventRepository.ts` — `createPaymentEvent()` appends `WEBHOOK_RECEIVED` and `STATUS_CHANGED`.
 9. Returns `202` with `{ duplicate, paymentId, status }`
@@ -37,6 +37,6 @@ Request: Run reconciliation after a partial failure
 Request: Rejection path when Support tries to run reconciliation
 1. `src/app/api/admin/reconciliation/run/route.ts` — `POST` enters the route.
 2. `src/lib/auth/guards.ts` — `withRouteAuth()` calls `requirePermission()`.
-3. `src/lib/auth/authorization.ts` — `requirePermission()` checks `src/lib/permissions.ts` and sees that `SUPPORT` lacks `Permission.RECONCILIATION_RUN`.
-4. `src/lib/api/route-helpers.ts` — `jsonError()` converts the thrown `RouteError` into an API response.
-5. Returns `403` with `{ error: { code: "FORBIDDEN", ... } }`
+3. `src/lib/auth/authorization.ts:21-23` — `requirePermission()` checks `src/lib/permissions.ts` and sees that `SUPPORT` lacks `Permission.RECONCILIATION_RUN`, so it throws `RouteError(403, "FORBIDDEN", ...)`.
+4. The throw happens at `src/lib/auth/guards.ts:32`, before the handler — and therefore before the handler's `try`/`catch` that calls `jsonError()` (`src/app/api/admin/reconciliation/run/route.ts:9-14`). Nothing in the wrapper catches it.
+5. Intended: `403` with `{ error: { code: "FORBIDDEN", ... } }`. Actual: the rejection escapes the route function and is handled by Next.js as an unhandled route error. Fixing it means catching in `withRouteAuth()` and returning `jsonError(error)`.

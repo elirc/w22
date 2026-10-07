@@ -16,7 +16,7 @@
 **Why read this:** It is the framework bridge between cookie sessions and the pure permission layer.
 **What to look for:** `withRouteAuth()` and `requirePagePermission()`.
 **What to trace:** Called by API routes like `src/app/api/payments/route.ts` and pages like `src/app/admin/reconciliation/page.tsx`; it calls `src/lib/auth/session.ts` and `src/lib/auth/authorization.ts`.
-**What a junior would likely miss:** If this wrapper is bypassed by even one route, the architecture looks secure but is not.
+**What a junior would likely miss:** If this wrapper is bypassed by even one route, the architecture looks secure but is not. Two concrete gaps: `src/app/api/webhooks/provider/route.ts` does not use it at all (no auth, no signature), and the wrapper itself throws its `RouteError` at line 32 without catching it, so 401/403 responses never pass through `jsonError()`.
 
 ## Step 4 — prisma/schema.prisma
 **Why read this:** The schema shows the real shape of the system better than any diagram.
@@ -40,7 +40,7 @@
 **Why read this:** It shows how to process async updates idempotently.
 **What to look for:** `processProviderWebhook()` checking `providerEventId` before mutating state.
 **What to trace:** Called by `src/app/api/webhooks/provider/route.ts` and `src/services/providerSimulatorService.ts`; it calls `src/lib/domain/paymentStateMachine.ts` and multiple repositories.
-**What a junior would likely miss:** The event row is persisted before the mutation is considered complete, which helps make retries safe.
+**What a junior would likely miss:** The `PROCESSED` dedupe check (lines 30-37) runs outside the transaction, while the event row is created inside it (lines 54-65). So two concurrent deliveries of one event can both pass the check, and the second insert fails on the `providerEventId` unique constraint. And because the `REJECTED` mark (line 125) is written on the same transaction that is then aborted by the rethrow (line 126), failed events leave no `WebhookEvent` row at all.
 
 ## Step 8 — src/lib/domain/paymentStateMachine.ts
 **Why read this:** It is the explicit state-transition guardrail.
@@ -52,7 +52,7 @@
 **Why read this:** Refunds are where "money-moving correctness" gets real.
 **What to look for:** `sumSuccessfulRefundsForPayment()` plus the full-vs-partial refund branch.
 **What to trace:** Called by `src/app/api/payments/[paymentId]/refund/route.ts`; it calls `src/repositories/refundRepository.ts`, `src/repositories/paymentRepository.ts`, and `src/repositories/paymentEventRepository.ts`.
-**What a junior would likely miss:** Prior refunds matter just as much as current payment status.
+**What a junior would likely miss:** Prior refunds matter just as much as current payment status. The reads now run on the transaction client (lines 25-34), but at the default isolation level two concurrent refunds can still both see the same prior total; see `astraupskill/02-CONCEPTS.md`.
 
 ## Step 10 — src/services/reconciliationService.ts
 **Why read this:** This is where eventual consistency becomes operationally visible.
